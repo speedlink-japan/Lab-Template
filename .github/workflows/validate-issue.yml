@@ -1,0 +1,68 @@
+name: Validate Issue
+
+on:
+  issues:
+    types:
+      - opened
+      - edited
+
+permissions:
+  issues: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+
+            const hasAssignee =
+              issue.assignees &&
+              issue.assignees.length > 0;
+
+            const labels = issue.labels.map(label => label.name);
+
+            const hasTypeLabel =
+              labels.includes('機能') ||
+              labels.includes('改善') ||
+              labels.includes('バグ');
+
+            const hasPriorityLabel =
+              labels.includes('最優先') ||
+              labels.includes('高') ||
+              labels.includes('中') ||
+              labels.includes('低');
+
+            let messages = [];
+
+            if (!hasAssignee) {
+              messages.push("担当者を設定してください");
+            }
+
+            if (!hasTypeLabel) {
+              messages.push("ラベルを設定してください（機能 / 改善 / バグ）");
+            }
+
+            if (!hasPriorityLabel) {
+              messages.push("優先度を設定してください（最優先 / 高 / 中 / 低）");
+            }
+
+            if (messages.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['ラベル/担当者/優先度が未設定']
+              });
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: messages.join('\n')
+              });
+            }
